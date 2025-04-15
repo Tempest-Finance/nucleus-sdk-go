@@ -11,6 +11,7 @@ import (
 	"github.com/Tempest-Finance/nucleus-sdk-go/pkg/rpcregistry"
 	"github.com/Tempest-Finance/nucleus-sdk-go/pkg/tests/abis/erc20"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/assert"
 )
@@ -142,5 +143,48 @@ func TestClient(t *testing.T) {
 
 		_, err = calldataQueue.GetCalldata(ctx)
 		assert.Error(t, err, "should return invalid target error")
+	})
+
+	t.Run("test get calldata and target", func(t *testing.T) {
+		ethClient, err := rpcRegistry.GetClient(chainId)
+		assert.NoError(t, err, "failed to get eth client")
+
+		calldataQueue, err := nucleus.NewCalldataQueue(chainId, strategistAddress, symbol, client, rpcRegistry)
+		assert.NoError(t, err, "failed to create calldata queue")
+
+		calldataQueue.AddCall(erc20Address, calldata, zero)
+
+		calldataBytes, target, err := calldataQueue.GetCalldataBytesAndTarget(ctx)
+		assert.NoError(t, err, "failed to get target and calldata")
+		assert.NotEmpty(t, calldata, "targets should not be empty")
+		assert.NotEmpty(t, target, "targetData should not be empty")
+
+		strategist, err := transactors.GetStrategist(strategistAddress)
+		assert.NoError(t, err, "failed to get strategist")
+
+		nonce, err := ethClient.PendingNonceAt(ctx, strategist.From)
+		assert.NoError(t, err, "failed to get nonce")
+
+		gasPrice, err := ethClient.SuggestGasPrice(ctx)
+		assert.NoError(t, err, "failed to get gas price")
+
+		gasLimit := uint64(300_000)
+
+		tx := types.NewTx(&types.LegacyTx{
+			Nonce:    nonce,
+			To:       target,
+			Value:    zero,
+			Gas:      gasLimit,
+			GasPrice: gasPrice,
+			Data:     calldataBytes,
+		})
+
+		signedTx, err := strategist.Signer(strategist.From, tx)
+		assert.NoError(t, err, "failed to sign transaction")
+
+		err = ethClient.SendTransaction(ctx, signedTx)
+		assert.NoError(t, err, "failed to send transaction")
+
+		t.Logf("txHash: %s", signedTx.Hash().Hex())
 	})
 }

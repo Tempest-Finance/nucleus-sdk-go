@@ -164,6 +164,37 @@ func (q *CalldataQueue) Execute(ctx context.Context, transactors IStrategistTran
 	return txHash, nil
 }
 
+func (q *CalldataQueue) GetCalldataBytesAndTarget(ctx context.Context) ([]byte, *common.Address, error) {
+	batchResults, err := q.getBatchProofsAndDecoders(ctx, q.calls)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var targets []common.Address
+	var data [][]byte
+	var values []*big.Int
+
+	for _, tx := range q.calls {
+		targets = append(targets, tx.Target)
+		values = append(values, tx.Val)
+		data = append(data, common.Hex2Bytes(strings.TrimPrefix(tx.Data, "0x")))
+	}
+
+	calldataBytes, err := manageroot.ABI.Pack(
+		"manageVaultWithMerkleVerification",
+		convertor.MapManageProofs(batchResults.ManageProofs),
+		convertor.MapDecodersAndSanitizersToAddresses(batchResults.DecodersAndSanitizers),
+		targets,
+		data,
+		values,
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to pack calldata: %w", err)
+	}
+
+	return calldataBytes, &q.managerAddress, nil
+}
+
 func (q *CalldataQueue) getBatchProofsAndDecoders(ctx context.Context, txs []Transaction) (*MerkleProofs, error) {
 	body, err := json.Marshal(map[string]interface{}{
 		"chain": strconv.FormatInt(q.chainId, 10),
