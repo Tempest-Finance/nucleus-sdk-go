@@ -17,7 +17,8 @@ type IClient interface {
 type ICalldataQueue interface {
 	AddCall(targetAddress common.Address, calldata []byte, value *big.Int)
 	GetCalldata(ctx context.Context) (*Calldata, error)
-	Execute(ctx context.Context) (string, error)
+	Execute(ctx context.Context, transactors IStrategistTransactor) (string, error)
+	GetCalldataBytesAndTarget(ctx context.Context) ([]byte, *common.Address, error)
 }
 
 type IStrategistTransactor interface {
