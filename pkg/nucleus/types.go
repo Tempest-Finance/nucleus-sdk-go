@@ -24,16 +24,18 @@ type HyperswapData struct {
 }
 
 type VaultDetail struct {
-	BoringVault    string `json:"boring_vault"`
-	Manager        string `json:"manager"`
-	Accountant     string `json:"accountant"`
-	Teller         string `json:"teller"`
-	RolesAuthority string `json:"roles_authority"`
+	BoringVault    string `json:"boring_vault,omitempty"`
+	Manager        string `json:"manager,omitempty"`
+	Accountant     string `json:"accountant,omitempty"`
+	RolesAuthority string `json:"roles_authority,omitempty"`
+	Teller         string `json:"teller,omitempty"`
+	LzTeller       string `json:"lz_teller,omitempty"`
+	OpTeller       string `json:"opteller,omitempty"`
 }
 
 type ChainConfig struct {
-	RoosterMicroManager string                 `json:"roosterMicroManager"`
-	Vaults              map[string]VaultDetail `json:"-"`
+	Vaults    map[string]VaultDetail `json:"-"`
+	Addresses map[string]string      `json:"-"`
 }
 
 func (n *ChainConfig) UnmarshalJSON(data []byte) error {
@@ -43,16 +45,16 @@ func (n *ChainConfig) UnmarshalJSON(data []byte) error {
 	}
 
 	n.Vaults = make(map[string]VaultDetail)
+	n.Addresses = make(map[string]string)
 	for key, value := range raw {
-		if key == "roosterMicroManager" {
-			if err := json.Unmarshal(value, &n.RoosterMicroManager); err != nil {
+		var vault VaultDetail
+		var address string
+		if err := json.Unmarshal(value, &vault); err != nil {
+			if err := json.Unmarshal(value, &address); err != nil {
 				return err
 			}
+			n.Addresses[key] = address
 		} else {
-			var vault VaultDetail
-			if err := json.Unmarshal(value, &vault); err != nil {
-				return err
-			}
 			n.Vaults[key] = vault
 		}
 	}
